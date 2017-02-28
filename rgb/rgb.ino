@@ -1,5 +1,5 @@
+// Adafruit NeoPixel - Version: Latest 
 #include <Adafruit_NeoPixel.h>
-#include "rgbtest3.h"
 #define LEFTPIN 2 // Left button (select)
 #define RIGHTPIN 3 // Right button (change)
 #define NEOPIN 6
@@ -13,6 +13,14 @@ int colorValueDiff = 8;
 int animationSteps = 8;
 int animationDelay = 20;
 int animationWait = 200;
+
+class Color {
+  public:
+    Color(int, int, int);
+    int r;
+    int g;
+    int b;
+};
 
 int randomColorValue() {
   int value = random(0,colorValueMax/colorValueDiff)*colorValueDiff;
