@@ -14,14 +14,16 @@
 
 1. If the colors match you are congratulated with a satisfying blink.
 
+The game is an endless `loop()`.
+
 ## Ingedients
 
 By design:
 
-* 1x Arduino-compatible board or chip
+* 1x Arduino-compatible board or chip (I use the ATtiny85 chip)
 * 2x Momentary-switch button
 * 1x NeoPixel Stick (8 x WS2812 5050 RGB LED)
 * 1x NeoPixel Jewel (7 X WS2812 5050 RGB LED)
-* 1x Power source
+* 1x Power source (5 volt)
 
 Other implementations are possible.
