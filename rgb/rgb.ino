@@ -1,170 +1,182 @@
 // Adafruit NeoPixel - Version: Latest 
 #include <Adafruit_NeoPixel.h>
-#define LEFTPIN 2 // Left button (select)
-#define RIGHTPIN 3 // Right button (change)
-#define NEOPIN 6
-#define BARLENGTH 8
+#define LEFTPIN 3 // Connector: Left button (select)
+#define RIGHTPIN 4 // Connector: Right button (change)
+#define NEOPIN 0 // Connector: NeoPixels
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(17, NEOPIN, NEO_GRB + NEO_KHZ800);
 
-int brightness = 255;
-int colorValueMax = 64;
-int colorValueDiff = 8;
-int animationSteps = 8;
-int animationDelay = 20;
-int animationWait = 200;
+byte colorValueMax = 64; // Color value limit to prevent blindness.
+byte colorValueDiff = 8; // The increments for color-values.
+byte animationSteps = 8; // Intermediate color-updates for fluid animations.
+byte animationDelay = 20; // Delay between color-updates in milliseconds. (20ms = ~50 fps)
+byte animationWait = 100; // Delay to slow things down a bit between actions.
+byte buttonWait = 100; // Button-press duration to be considered for long-press.
 
+// The order in which the RGB LEDs are connected to NEOPIN.
+byte ring[7] = {0,1,2,3,4,5,6};
+byte leftBar[4] = {7,8,9,10};
+byte rightBar[4] = {11,12,13,14};
+
+// The color-component representation of the ring.
+byte rgb = ring[0];
+byte r = ring[1];;
+byte rg = ring[2];;
+byte g = ring[3];;
+byte gb = ring[4];;
+byte b = ring[5];;
+byte br = ring[6];;
+
+// Our own Color class.
 class Color {
   public:
-    Color(int, int, int);
-    int r;
-    int g;
-    int b;
+    Color(byte, byte, byte);
+    byte r;
+    byte g;
+    byte b;
 };
 
-int randomColorValue() {
-  int value = random(0,colorValueMax/colorValueDiff)*colorValueDiff;
-  return value;
+// A single random integer value, adjusted to our own needs.
+byte randomColorValue() {
+  return (random(0,colorValueMax/colorValueDiff)*colorValueDiff);
 }
 
-Color::Color(int r=randomColorValue(), int g=randomColorValue(), int b=randomColorValue()) {
+Color::Color(
+    byte r=randomColorValue(),
+    byte g=randomColorValue(),
+    byte b=randomColorValue()
+  ) {
   this->r = r;
   this->g = g;
   this->b = b;
 }
 
 Color black = Color(0,0,0);
+Color white = Color(255,255,255);
 Color aim = Color(0,0,0);
-Color targets[BARLENGTH];
 
-void fadeLeftBarColor(Color &target) {
+Color getColor(byte pin) {
 
-  uint32_t fc = strip.getPixelColor(7);
+  uint32_t fc = strip.getPixelColor(0);
   
-  byte fr = fc >> 16;
-  byte fg = fc >> 8;
-  byte fb = fc;
-  int rs = (target.r-fr)/animationSteps;
-  int gs = (target.g-fg)/animationSteps;
-  int bs = (target.b-fb)/animationSteps;
+  uint8_t fr = fc >> 16;
+  uint8_t fg = fc >> 8;
+  uint8_t fb = fc;
+  
+  return Color(fr,fg,fb);
+}
 
-  for(int i=1; i<animationSteps; i++) {
-    for(int j=7; j<7+4; j++) {
-      strip.setPixelColor(j,fr+rs*i,fg+gs*i,fb+bs*i);
+
+// Change color of LEDs.
+// Length of array 'final' must be either 1 or equal to the 'pin' array length.
+void setColor(byte pin[], byte pins, Color color) {
+  for(int i = 0; i < pins; i++) {
+    strip.setPixelColor(pin[i],color.r,color.g,color.b);
+  }
+}
+
+// Fade color of LEDs.
+// Length of array 'final' must be either 1 or equal to the 'pin' array length.
+void fadeColor(byte pin[], byte pins, Color final) {
+
+  Color original = getColor(pin[0]);
+  
+  for(int i=1; i<=animationSteps; i++) {
+    for(int j=0; j<pins; j++) {
+      strip.setPixelColor(pin[j],
+        original.r+(final.r-original.r)/animationSteps*i,
+        original.g+(final.g-original.g)/animationSteps*i,
+        original.b+(final.b-original.b)/animationSteps*i
+      );
     }
     strip.show();
     delay(animationDelay);
   }
-  for(int j=7; j<7+4; j++) {
-    strip.setPixelColor(j,target.r,target.g,target.b);
-  }
+}
+
+void flashPixel(byte pin[], byte pins) {
+
+  Color original = getColor(pin[0]);
+  
+  setColor(pin,pins,white);
   strip.show();
   delay(animationDelay);
+
+  setColor(pin,pins,original);
+  strip.show();
 }
 
 void presentColor(Color target) {
-  fadeLeftBarColor(black);
+  flashPixel(leftBar,4);
   delay(animationWait);
-  fadeLeftBarColor(target);
-  delay(animationWait);
+  fadeColor(leftBar,4,target);
 }
 
 void confirmColor() {
 
   uint32_t fc = strip.getPixelColor(7);
   
-  byte fr = fc >> 16;
-  byte fg = fc >> 8;
-  byte fb = fc;
-
-  for(int j=7; j<7+BARLENGTH; j++) {
-      strip.setPixelColor(j,0,0,0);
-  }
-  strip.show();
-
-  delay(animationDelay);
-
-  for(int j=7; j<7+BARLENGTH; j++) {
-      strip.setPixelColor(j,colorValueMax,colorValueMax,colorValueMax);
-  }
-  strip.show();
-
-  delay(animationDelay);
+  uint8_t fr = fc >> 16;
+  uint8_t fg = fc >> 8;
+  uint8_t fb = fc;
   
-  for(int j=7; j<7+BARLENGTH; j++) {
-      strip.setPixelColor(j,fr,fg,fb);
-  }
-  strip.show();
+  Color original = Color(fr,fg,fb);
 
+  setColor(leftBar,4,&black);
+  setColor(rightBar,4,&black);
+  strip.show();
   delay(animationDelay);
+
+  setColor(leftBar,4,&white);
+  setColor(rightBar,4,&white);
+  strip.show();
+  delay(animationDelay);
+
+  setColor(leftBar,4,&original);
+  setColor(rightBar,4,&original);
+  strip.show();
+  delay(animationDelay);
+
+  delete &original;
+
 }
 
-void flashPixel(char color) {
-  int index;
-  switch (color) {
-    case 'r':
-      index = 1;
-      break;
-    case 'g':
-      index = 3;
-      break;
-    case 'b':
-      index = 5;
-      break;
-  }
-  
-  uint32_t fc = strip.getPixelColor(index);
-  
-  byte fr = fc >> 16;
-  byte fg = fc >> 8;
-  byte fb = fc;  
-  
-  strip.setPixelColor(index,colorValueMax,colorValueMax,colorValueMax);
-  strip.show();
-  delay(animationDelay);
-  strip.setPixelColor(index,fr,fg,fb);
-  strip.show();
-  delay(animationWait);
-}
-
-void setRightBarColor(int r, int g, int b) {
-  for( int i = 7+4; i < 7+BARLENGTH; i++) {
-    strip.setPixelColor(i,r,g,b);
-  }
-}
-
-void fadeMiddleColor() {
+void setRingColor(Color color) {
 
   uint32_t fc = strip.getPixelColor(0);
   
-  byte fr = fc >> 16;
-  byte fg = fc >> 8;
-  byte fb = fc;
-  int rs = (aim.r-fr)/animationSteps;
-  int gs = (aim.g-fg)/animationSteps;
-  int bs = (aim.b-fb)/animationSteps;
+  uint8_t fr = fc >> 16;
+  uint8_t fg = fc >> 8;
+  uint8_t fb = fc;
+  uint8_t rs = (color.r-fr)/animationSteps;
+  uint8_t gs = (color.g-fg)/animationSteps;
+  uint8_t bs = (color.b-fb)/animationSteps;
 
   for(int i=1; i<animationSteps; i++) {
-    strip.setPixelColor(0,fr+rs*i,fg+gs*i,fb+bs*i);
-    strip.setPixelColor(1,fr+rs*i,0,0);
-    strip.setPixelColor(2,fr+rs*i,fg+gs*i,0);
-    strip.setPixelColor(3,0,fg+gs*i,0);
-    strip.setPixelColor(4,0,fg+gs*i,fb+bs*i);
-    strip.setPixelColor(5,0,0,fb+bs*i);
-    strip.setPixelColor(6,fr+rs*i,0,fb+bs*i);
+    strip.setPixelColor(rgb,fr+rs*i,fg+gs*i,fb+bs*i);
+    strip.setPixelColor(r,fr+rs*i,0,0);
+    strip.setPixelColor(rg,fr+rs*i,fg+gs*i,0);
+    strip.setPixelColor(g,0,fg+gs*i,0);
+    strip.setPixelColor(gb,0,fg+gs*i,fb+bs*i);
+    strip.setPixelColor(b,0,0,fb+bs*i);
+    strip.setPixelColor(br,fr+rs*i,0,fb+bs*i);
 
-    setRightBarColor(fr+rs*i,fg+gs*i,fb+bs*i);
+    setColor(rightBar,4,Color(fr+rs*i,fg+gs*i,fb+bs*i));
 
     strip.show();
     delay(animationDelay);
   }
-  strip.setPixelColor(0,aim.r,aim.g,aim.b);
-  strip.setPixelColor(1,aim.r,0,0);
-  strip.setPixelColor(2,aim.r,aim.g,0);
-  strip.setPixelColor(3,0,aim.g,0);
-  strip.setPixelColor(4,0,aim.g,aim.b);
-  strip.setPixelColor(5,0,0,aim.b);
-  strip.setPixelColor(6,aim.r,0,aim.b);
+
+  strip.setPixelColor(rgb,color.r,color.g,color.b);
+  strip.setPixelColor(r,color.r,0,0);
+  strip.setPixelColor(rg,color.r,color.g,0);
+  strip.setPixelColor(g,0,color.g,0);
+  strip.setPixelColor(gb,0,color.g,color.b);
+  strip.setPixelColor(b,0,0,color.b);
+  strip.setPixelColor(br,color.r,0,color.b);
+
+  setColor(rightBar,4,color);
+
   strip.show();
 
 }
@@ -174,60 +186,63 @@ int compareColor(Color lhs, Color rhs) {
 }
 
 void matchColor(Color target) {
+  
+  uint8_t components[] = {r,g,b};
+  uint8_t *pointers[] = {&aim.r,&aim.g,&aim.b};
+  uint8_t selected = 0;
+  
+  boolean left;
+  boolean right;
 
   while(!compareColor(aim, target)) {
-    int left;
-    int right;
+    
+    delay(buttonWait);
+    
     do {
+      delay(buttonWait/4);
       left = digitalRead(LEFTPIN);
       right = digitalRead(RIGHTPIN);
-      delay(animationDelay);
-    } while (left == LOW && right == LOW);
-/*
-    flashPixel('r');
-    while(aim.r < target.r) {
-      aim.r+=colorValueDiff;
-      fadeMiddleColor();
+    } while (!left && !right);
+
+    if(left) {
+      selected++;
+      selected%=3;
+      flashPixel(&components[selected],1);
+    } else {
+      boolean hold = true;
+      for (byte i = 0; i < 6; i++) {
+        delay(buttonWait/2);
+        if(!digitalRead(RIGHTPIN)) {
+          hold = false;
+          break;
+        }
+      }
+      if(hold) {
+        *pointers[selected] -= colorValueDiff;
+      } else {
+        *pointers[selected] += colorValueDiff;
+      }
+      *pointers[selected] %= colorValueMax+colorValueDiff;
+      setRingColor(aim);
+      if(hold) {
+        delay(buttonWait*2);
+      }
     }
-    while(aim.r > target.r) {
-      aim.r-=colorValueDiff;
-      fadeMiddleColor();
-    }
-    flashPixel('g');
-    while(aim.g < target.g) {
-      aim.g+=colorValueDiff;
-      fadeMiddleColor();
-    }
-    while(aim.g > target.g) {
-      aim.g-=colorValueDiff;
-      fadeMiddleColor();
-    }
-    flashPixel('b');
-    while(aim.b < target.b) {
-      aim.b+=colorValueDiff;
-      fadeMiddleColor();
-    }
-    while(aim.b > target.b) {
-      aim.b-=colorValueDiff;
-      fadeMiddleColor();
-    }
-*/
   }
 }
 
 void setup() {
-  strip.setBrightness(brightness);
-  strip.begin();
-  strip.show();
+  strip.setBrightness(64); // Set LEDs to maximum brightness.
+  strip.begin(); // Initiate LEDs.
+  strip.show(); // Update LEDs' value to black.
   pinMode(LEFTPIN,INPUT);
   pinMode(RIGHTPIN,INPUT);
 }
 
 void loop() {
-  for (int i=0; i<BARLENGTH; i++) {
-    presentColor(targets[i]);
-    matchColor(targets[i]);
-    delay(animationWait);
+    Color target = new Color();
+    presentColor(target);
+    matchColor(target);
     confirmColor();
-  }
+    delete &target;
 }
